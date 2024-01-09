@@ -4,9 +4,9 @@ from typing import Any, Dict, List
 import requests
 
 
-class SpoonacularClient(object):
+class SpoonacularBaseClient(object):
     """
-    Client for interacting with the Spoonacular API.
+    Base class for inheritance.
 
     Attributes:
         base_url (str): The base URL for the Spoonacular API.
@@ -25,6 +25,56 @@ class SpoonacularClient(object):
         self.base_url = 'https://api.spoonacular.com/'
         self.api_key = api_key
 
+
+class SpoonacularBaseGetClient(SpoonacularBaseClient):
+    """
+    Client for interacting with the GET methods of Spoonacular API.
+
+    Attributes:
+        base_url (str): The base URL for the Spoonacular API.
+        api_key (str): The API key used for authentication.
+
+    Methods:
+        get_response(self, rest_url: str, user_data:
+        Dict[str, Any] = None) -> requests.Response:
+        Get the API response for a given URL.
+
+        Args:
+            rest_url (str): The specific endpoint of the Spoonacular API.
+            user_data (Dict[str, Any], optional):
+            Additional data for the request. Defaults to None.
+
+        Returns:
+            requests.Response: The response object from the API request.
+    """
+
+    def get_response(
+        self, rest_url: str, user_data: Dict[str, Any] = None,
+    ) -> requests.Response:
+        """
+        Get the API response for a given URL.
+
+        Args:
+            rest_url (str): The specific endpoint of the Spoonacular API.
+            user_data (Dict[str, Any], optional):
+            Additional data for the request. Defaults to None.
+
+        Returns:
+            requests.Response: The response object from the API request.
+        """
+        if user_data is None:
+            user_data = {}
+        user_data['apiKey'] = self.api_key
+        return requests.get(
+            f'{self.base_url}{rest_url}',
+            params=user_data,
+            timeout=self.timeout,
+        )
+
+
+class SpoonacularGetClient(SpoonacularBaseGetClient):
+    """Client for interacting with the GET methods of Spoonacular API."""
+
     def get_recipes_by_ingredients(
         self, user_data: Dict[str, Any],
     ) -> dict:
@@ -38,16 +88,10 @@ class SpoonacularClient(object):
         Returns:
             dict: Dictionary with recipe information.
         """
-        user_data['apiKey'] = self.api_key
-        response = requests.get(
-            f'{self.base_url}recipes/findByIngredients',
-            params=user_data,
-            timeout=self.timeout,
-        )
-        if response.status_code == 200:
+        response = self.get_response('recipes/findByIngredients', user_data)
+        if response.status_code == requests.codes.ok:
             id_list = [recipe['id'] for recipe in response.json()]
             return {'ids_of_recipes': id_list}
-        print(f'Error! Status - {response.status_code}')
         return {'ids_of_recipes': ''}
 
     def get_taste_by_id_of_dish(self, dish_id: str) -> dict:
@@ -60,12 +104,12 @@ class SpoonacularClient(object):
         Returns:
             dict: Dictionary with taste information.
         """
-        response = requests.get(
-            f'{self.base_url}recipes/{dish_id}/tasteWidget.json',
-            params={'apiKey': self.api_key},
-            timeout=self.timeout,
-        )
+        response = self.get_response(f'recipes/{dish_id}/tasteWidget.json')
         return response.json()
+
+
+class SpoonacularPostClient(SpoonacularBaseClient):
+    """Client for interacting with the Spoonacular API."""
 
     def compute_glycemic_load(self, payload: Dict[str, List[str]]) -> dict:
         """
@@ -87,10 +131,11 @@ class SpoonacularClient(object):
 
 
 api_key = '6970f7110b5948bcabf091a25eff8b24'
-spoonacular_client = SpoonacularClient(api_key)
+spoonacular_get_client = SpoonacularGetClient(api_key)
+spoonacular_post_client = SpoonacularPostClient(api_key)
 data_for_request = {'ingredients': 'sugar', 'number': '3'}
-recipes = spoonacular_client.get_recipes_by_ingredients(data_for_request)
-taste_of_dish = spoonacular_client.get_taste_by_id_of_dish('635315')
-glycemic_load = spoonacular_client.compute_glycemic_load(
+recipes = spoonacular_get_client.get_recipes_by_ingredients(data_for_request)
+taste_of_dish = spoonacular_get_client.get_taste_by_id_of_dish('635315')
+glycemic_load = spoonacular_post_client.compute_glycemic_load(
     {'ingredients': ['1 kiwi', '2 cups rice', '2 glasses of water']},
 )
